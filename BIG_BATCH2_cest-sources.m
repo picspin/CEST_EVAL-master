@@ -17,7 +17,7 @@
 %   --SHORT  DOC--
 
 %% add current folder and subfolders to path
-addpath(fullfile(pwd, 'functions'));
+addpath(fullfile(pwd, '.'));
 
 %%
 clear all; close all; clc
@@ -27,8 +27,7 @@ clear all; close all; clc
 % we assume that you have the normalization stack M0
 % the saturated  stack Mz
 % and the parameter struct P containing
-% [M0_stack, Mz_stack, P] = LOAD('USER');
-P.SEQ.w= [-5:0.25:5];
+P.SEQ.w= [-7:0.25:7];
 P.EVAL.w_interp=P.SEQ.w;
 P.SEQ.stack_dim=size(Mz_stack);
 
@@ -36,15 +35,19 @@ if ~exist('M0_stack') || ~exist('Mz_stack') || ~exist('P')|| ~isfield(P.SEQ,'w')
     errordlg('missing data');
 end;
 
+%% make a 2D Segment or 3D segment
 % Calculate M0mean outside the conditional statement
-M0mean = mean(M0_for_seg(M0_for_seg > 0));  
+M0mean = mean(M0_stack(M0_stack > 0));
 % this creates the mask Segment
 % 1. A simple binary mask segment
 %Segment= M0_stack>0.2*mean(M0_stack(:)); 
-Segment = M0_for_seg > 0.2 * M0mean
+Segment = M0_stack > 0.2 * M0mean;
 % 2. A function based  mask segment by free ROI selection mode
 %Segment= make_Segment(M0_stack, 'free', mean(M0_stack(M0_stack>0)).*[0.3]); 
-%Segment= make_Segment(M0_for_seg, 'free', 0.3 * M0mean); 
+%Segment= make_Segment(M0_stack, 'free', 0.3 * M0mean); 
+% 3. Replicate Segment in the 3rd and 4th dimensions
+%Segment = repmat(Segment, [1 1 1 size(Mz_stack, 4)]);  % or [1 1 size(Mz_stack,3) size(Mz_stack,4) ] if size(Mz_stack,3) > 1
+
 %   **********************************
 
 %% WASSR1 EVAL
@@ -70,7 +73,6 @@ P.EVAL.w_fit = min(P.SEQ.w):0.01:max(P.SEQ.w);
 
 [Z_corrExt] = NORM_ZSTACK(Mz_CORR,M0_stack,P,Segment);
 
-
 %% save
 save matlab.mat ;
 
@@ -81,18 +83,18 @@ close(imgui); imgui
 %% Multi-Lorentzian fitting
 
 P.FIT.options   = [1E-04, 1E-15, 1E-10, 1E-04, 1E-06];
-P.FIT.nIter     = 50;
+P.FIT.nIter     = 50;    %  iteration steps
 P.FIT.modelnum  = 5;     %% number of Lorentzian pools (possible 1-5)
 
 P.FIT.extopt=1; % change parameters explicitly
 %Lorentzian line LI defined by amplitude Ai, width Gi [ppm] and offset dwi[ppm]: Li=Ai.*Gi^2/4./ (Gi^2/4+(dw-dwi).^2) ;
 %1=water; 2=amide; 3=NOE; 4=MT; 5=amine
-%const.Zi   A1    G1    dw1     A2     G2    dw2     A3    G3   dw3     A4    G4   dw4    A3    G3   dw3
-lb = [ 0.5  0.02  0.3  -1       0.0    0.4   +3     0.0    1    -4.5    0.0   10   -4     0.0   1    1   ];
-ub = [ 1    1     10   +1       0.2    3     +4     0.4    5    -2        1   100  -1     0.2   3.5  2.5 ];
-p0 = [ 1    0.9   1.4   0       0.025  0.5   3.5     0.02   3    -3.5    0.1   25   -1     0.01  1.5  2.2 ];
+%const.Zi   A1    G1    dw1     A2     G2    dw2     A3    G3   dw3     A4    G4   dw4    A5    G5   dw5
+lb = [ 0.5  0.02  0.3  -1       0.0    0.4   +3     0.0    1    -4.5    0.0   10   -4     0.0   1    1   ];     % lower bound
+ub = [ 1    1     10   +1       0.2    3     +4     0.4    5    -2        1   100  -1     0.2   3.5  2.5 ];     % Upper bound
+p0 = [ 1    0.9   1.4   0       0.025  0.5   3.5     0.02   3    -3.5    0.1   25   -1     0.01  1.5  2.2 ];    % chemical shift
 P.FIT.lower_limit_fit = lb; P.FIT.upper_limit_fit = ub; P.FIT.start_fit = p0;
-
+ 
 Segment= make_Segment(M0_stack, 'free', mean(M0_stack(M0_stack>0)).*[0.3]); % choose smalle ROI for testing
 close all
 
