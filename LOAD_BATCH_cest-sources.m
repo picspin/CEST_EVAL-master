@@ -19,23 +19,60 @@ P.SEQ.stack_dim=size(Mz_stack);
 %% LOAD philips CEST-DATA (rec par)
 
 clear Z Mz_stack M0_stack Mz_CORR
-[imagesOut, ParsOut] = read_rec_file('filename.REC'); % cd to recpar folder and adjust filename
-size(imagesOut)
-for ii=1:size(imagesOut,3)
-S(:,:,1,ii)=squeeze(imagesOut(1,1,ii,1,1,:,:)); % adjust dimensions if needed, here its x,y,z,w
-end;
 
-M0_stack=S(:,:,1,1);        % first image is unsaturated M0 image, adjust if necessary
-Mz_stack=S(:,:,1,2:end-1);  % all the others are the saturated images
-P.SEQ.w=linspace(-5,5,18)'; % give offsets manually
+% Set the path to the folder containing the .rec and .par files
+[filename, dataFolder] = uigetfile({'*.REC','Philips REC files (*.REC)'; '*.*', 'All Files (*.*)'}, 'Select a Philips REC file');
 
-% some parameters the routines need later
-P.EVAL.w_fit=(-10:0.01:10)';
-P.EVAL.w_interp=P.SEQ.w;
-P.SEQ.stack_dim=size(Mz_stack);
-P.EVAL.lowerlim_slices=1;
-P.EVAL.upperlim_slices=size(M0_stack,3);
-clearvars -except  P Mz_stack M0_stack image_z x X ROI_def Segment dB0_stack_ext dB0_stack_int
+% Check if the user selected a file
+if isequal(filename,0)
+    disp('User selected Cancel')
+    return  % Exit the script if no file is selected
+else
+    disp(['User selected ', fullfile(dataFolder, filename)])
+end
+
+% Read the .rec file
+[imagesOut, ParsOut, meta] = read_par_rec_file(fullfile(dataFolder, filename));
+
+% Display the size of the output images
+disp(size(imagesOut));
+
+% Initialize the S matrix
+S = imagesOut;
+
+% Extract the M0 image (unsaturated)
+M0_stack = S(:, :, :, 1);  % First dynamic is unsaturated M0 image, adjust if necessary
+
+% Extract the Mz images (saturated)
+Mz_stack = S(:, :, :, 2:end);  % All the others are the saturated images
+
+% Define the offsets manually
+P.SEQ.w = linspace(-5, 5, size(Mz_stack, 4))';
+
+% Define some parameters needed later
+P.EVAL.w_fit = (-10:0.01:10)';
+P.EVAL.w_interp = P.SEQ.w;
+P.SEQ.stack_dim = size(Mz_stack);
+P.EVAL.lowerlim_slices = 1;
+P.EVAL.upperlim_slices = size(M0_stack, 3);
+
+% Update P.SEQ with essential parameters
+P.SEQ.Matrix = ParsOut.Matrix;
+P.SEQ.Res_XYZ = ParsOut.Res_XYZ;
+P.SEQ.N_slices = ParsOut.N_slices;
+P.SEQ.N_dynamics = ParsOut.N_dynamics;
+P.SEQ.N_card = ParsOut.N_card;
+P.SEQ.Orientation = ParsOut.Orientation;
+P.SEQ.offcenter_XYZ = ParsOut.offcenter_XYZ;
+P.SEQ.TE = ParsOut.TE;
+P.SEQ.N_averages = ParsOut.N_averages;
+
+% Store the header information in meta
+metaInfo = meta;
+
+% Clear unnecessary variables
+clearvars -except P Mz_stack M0_stack image_z x X ROI_def Segment dB0_stack_ext dB0_stack_int metaInfo
+
  
 %% LOAD GE CEST-DATA (On developing)
 

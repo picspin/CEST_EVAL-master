@@ -1,0 +1,69 @@
+%%
+addpath(genpath(cd('.')))
+%%
+clear all; close all; clc
+
+%% manual load of converted nii (only in newer Matlab version):
+%use mricron etc. to turn yoru dicoms into a 4D nii
+M_stack=niftiread(uigetfile('*.*'));
+M0_stack=M_stack(:,:,:,1);  %unsaturated M0
+Mz_stack=M_stack(:,:,:,2:end);  % saturated Mz by scale
+P.SEQ.w= [-5:0.25:5];   % delta frequencies and offset
+P.EVAL.w_interp=P.SEQ.w;
+P.SEQ.stack_dim=size(Mz_stack);
+
+%% LOAD Siemens CEST-DATA
+[M0_stack, Mz_stack, P] = LOAD('USER'); % thats quite automized, good luck
+
+
+%% LOAD philips CEST-DATA (rec par)
+
+clear Z Mz_stack M0_stack Mz_CORR
+dataFolder = 'E:\Projects\CEST\CEST_EVAL-master\example_data\Philip';   % cd the path containing Philip's data
+filename = fullfile(dataFolder, 'crmap12_wip_cwspiral2s_5_1.rec');  % Read the .rec file
+[imagesOut, ParsOut] = read_rec_file(filename);
+
+% Display the size of the output images
+%size(imagesOut)
+disp(size(imagesOut));
+
+for ii=1:size(imagesOut,3)
+S(:,:,1,ii)=squeeze(imagesOut(1,1,ii,1,1,:,:)); % adjust dimensions if needed, here its x,y,z,w
+end;
+
+M0_stack=S(:,:,1,1);        % first image is unsaturated M0 image, adjust if necessary
+Mz_stack=S(:,:,1,2:end-1);  % all the others are the saturated images
+P.SEQ.w=linspace(-5,5,18)'; % give offsets manually
+
+% some parameters the routines need later
+P.EVAL.w_fit=(-10:0.01:10)';
+P.EVAL.w_interp=P.SEQ.w;
+P.SEQ.stack_dim=size(Mz_stack);
+P.EVAL.lowerlim_slices=1;
+P.EVAL.upperlim_slices=size(M0_stack,3); 
+
+% Update P.SEQ with essential parameters
+P.SEQ.Matrix = ParsOut.Matrix;
+P.SEQ.Res_XYZ = ParsOut.Res_XYZ;
+P.SEQ.N_slices = ParsOut.N_slices;
+P.SEQ.N_dynamics = ParsOut.N_dynamics;
+P.SEQ.N_card = ParsOut.N_card;
+P.SEQ.Orientation = ParsOut.Orientation;
+P.SEQ.offcenter_XYZ = ParsOut.offcenter_XYZ;
+P.SEQ.TE = ParsOut.TE;
+P.SEQ.N_averages = ParsOut.N_averages;
+
+% Store the header information in meta
+metaInfo = meta;
+
+clearvars -except  P Mz_stack M0_stack image_z x X ROI_def Segment dB0_stack_ext dB0_stack_int
+ 
+%% LOAD GE CEST-DATA (On developing)
+
+clear Z Mz_stack M0_stack Mz_CORR
+
+
+
+
+
+
